@@ -1,0 +1,628 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                       String                 @id @default(uuid())
+  email                    String                 @unique
+  password                 String?
+  firstName                String
+  lastName                 String
+  role                     UserRole
+  isActive                 Boolean                @default(true)
+  avatarUrl                String?
+  phoneNumber              String?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  accounts                 Account[]
+  announcements            Announcement[]
+  announcementReactions    AnnouncementReaction[]
+  announcementReads        AnnouncementRead[]
+  chatRoomParticipants     ChatRoomParticipant[]
+  coach                    Coach?
+  equipmentManager         EquipmentManager?
+  eventRSVPs               EventRSVP[]
+  familyMember             FamilyMember?
+  maintenanceLogs          MaintenanceLog[]
+  receivedMessages         Message[]              @relation("MessageReceiver")
+  sentMessages             Message[]              @relation("MessageSender")
+  createdPlays             Play[]
+  playViews                PlayView[]
+  player                   Player?
+  pushSubscriptions        PushSubscription[]
+  sessions                 Session[]
+  teamMemberships          TeamMember[]
+  trainingProgress         TrainingProgress[]
+  trainingAssigned         TrainingTask[]         @relation("AssignedBy")
+  uploadedVideos           Video[]
+  videoAssignmentsCreated  VideoAssignment[]      @relation("AssignedBy")
+  videoAssignmentsReceived VideoAssignment[]      @relation("AssignedTo")
+  videoNotes               VideoNote[]
+  filmStudyMarkers         FilmStudyMarker[]
+  filmStudyMarkerReplies   FilmStudyMarkerReply[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Team {
+  id             String         @id @default(uuid())
+  name           String
+  logoUrl        String?
+  primaryColor   String         @default("#000000")
+  secondaryColor String         @default("#FFFFFF")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  announcements  Announcement[]
+  chatRooms      ChatRoom[]
+  equipment      Equipment[]
+  events         Event[]
+  games          Game[]
+  playbooks      Playbook[]
+  plays          Play[]
+  practices      Practice[]
+  members        TeamMember[]
+}
+
+model TeamMember {
+  id       String   @id @default(uuid())
+  userId   String
+  teamId   String
+  joinedAt DateTime @default(now())
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+}
+
+model Player {
+  id               String         @id @default(uuid())
+  userId           String         @unique
+  jerseyNumber     Int?
+  position         String?
+  chairModel       String?
+  chairColor       String?
+  birthDate        DateTime?
+  medicalNotes     String?
+  emergencyContact String?
+  emergencyPhone   String?
+  equipment        Equipment[]
+  familyMembers    FamilyMember[]
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stats            PlayerStat[]
+}
+
+model Coach {
+  id             String  @id @default(uuid())
+  userId         String  @unique
+  specialization String?
+  certification  String?
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EquipmentManager {
+  id            String  @id @default(uuid())
+  userId        String  @unique
+  department    String?
+  certification String?
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FamilyMember {
+  id           String @id @default(uuid())
+  userId       String @unique
+  playerId     String
+  relationship String
+  player       Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChatRoom {
+  id           String                @id @default(uuid())
+  name         String
+  type         String
+  teamId       String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  team         Team?                 @relation(fields: [teamId], references: [id])
+  participants ChatRoomParticipant[]
+  messages     Message[]
+}
+
+model ChatRoomParticipant {
+  id         String   @id @default(uuid())
+  chatRoomId String
+  userId     String
+  joinedAt   DateTime @default(now())
+  lastReadAt DateTime @default(now())
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatRoomId, userId])
+}
+
+model Message {
+  id          String              @id @default(uuid())
+  content     String
+  senderId    String
+  receiverId  String?
+  chatRoomId  String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  isPinned    Boolean             @default(false)
+  readBy      String[]
+  mentions    String[]
+  chatRoom    ChatRoom?           @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  receiver    User?               @relation("MessageReceiver", fields: [receiverId], references: [id])
+  sender      User                @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  attachments MessageAttachment[]
+}
+
+model MessageAttachment {
+  id           String   @id @default(uuid())
+  messageId    String
+  fileName     String
+  fileType     String
+  fileSize     Int
+  fileUrl      String
+  thumbnailUrl String?
+  createdAt    DateTime @default(now())
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model Announcement {
+  id        String                 @id @default(uuid())
+  title     String
+  content   String
+  authorId  String
+  isPinned  Boolean                @default(false)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  expiresAt DateTime?
+  priority  AnnouncementPriority   @default(NORMAL)
+  teamId    String?
+  author    User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  team      Team?                  @relation(fields: [teamId], references: [id])
+  reactions AnnouncementReaction[]
+  readBy    AnnouncementRead[]
+}
+
+model AnnouncementRead {
+  id             String       @id @default(uuid())
+  announcementId String
+  userId         String
+  readAt         DateTime     @default(now())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+}
+
+model AnnouncementReaction {
+  id             String       @id @default(uuid())
+  announcementId String
+  userId         String
+  emoji          String
+  createdAt      DateTime     @default(now())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Game {
+  id           String       @id @default(uuid())
+  teamId       String
+  opponentName String
+  homeOrAway   String
+  location     String?
+  date         DateTime
+  score        String?
+  result       String?
+  notes        String?
+  team         Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerStats  PlayerStat[]
+  teamStats    TeamStat[]
+}
+
+model PlayerStat {
+  id                  String    @id @default(uuid())
+  playerId            String
+  gameId              String?
+  practiceId          String?
+  goalsScored         Int       @default(0)
+  assists             Int       @default(0)
+  saves               Int       @default(0)
+  playingTimeMinutes  Int       @default(0)
+  spinMoves           Int       @default(0)
+  defensiveBlocks     Int       @default(0)
+  penalties           Int       @default(0)
+  batteryUsagePercent Int?
+  speedZoneLow        Int       @default(0)
+  speedZoneMid        Int       @default(0)
+  speedZoneHigh       Int       @default(0)
+  coachRating         Int?
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  game                Game?     @relation(fields: [gameId], references: [id])
+  player              Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  practice            Practice? @relation(fields: [practiceId], references: [id])
+}
+
+model TeamStat {
+  id                       String  @id @default(uuid())
+  gameId                   String
+  possession               Int?
+  powerPlayGoals           Int     @default(0)
+  powerPlayOpportunities   Int     @default(0)
+  penaltyKillSuccess       Int     @default(0)
+  penaltyKillOpportunities Int     @default(0)
+  shotsOnGoal              Int     @default(0)
+  formation                String?
+  notes                    String?
+  game                     Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+model Video {
+  id           String            @id @default(uuid())
+  title        String
+  description  String?
+  youtubeId    String?
+  dailyVideoId String?
+  externalUrl  String?
+  fileUrl      String?
+  fileName     String?
+  fileSize     Int?
+  mimeType     String?
+  thumbnail    String?
+  category     String            @default("all")
+  tags         String[]
+  uploaderId   String
+  duration     Int?
+  isPublic     Boolean           @default(false)
+  viewCount    Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  uploader         User              @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  assignments      VideoAssignment[]
+  notes            VideoNote[]
+  filmStudyMarkers FilmStudyMarker[]
+}
+
+model VideoNote {
+  id          String   @id @default(uuid())
+  videoId     String
+  userId      String
+  timestamp   Int
+  content     String
+  drawingData Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  author      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+}
+
+model VideoAssignment {
+  id           String    @id @default(uuid())
+  videoId      String
+  assignedToId String
+  assignedById String
+  dueDate      DateTime?
+  isCompleted  Boolean   @default(false)
+  completedAt  DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  assignedBy   User      @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
+  assignedTo   User      @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: Cascade)
+  video        Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+}
+
+model FilmStudyMarker {
+  id          String                 @id @default(uuid())
+  videoId     String
+  userId      String
+  timestamp   Int
+  title       String
+  content     String?
+  type        FilmStudyMarkerType    @default(NOTE)
+  color       String                 @default("#22c55e")
+  drawingData Json?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  author      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video       Video                  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  replies     FilmStudyMarkerReply[]
+}
+
+model FilmStudyMarkerReply {
+  id        String          @id @default(uuid())
+  markerId  String
+  userId    String
+  content   String
+  createdAt DateTime        @default(now())
+  author    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marker    FilmStudyMarker @relation(fields: [markerId], references: [id], onDelete: Cascade)
+}
+
+enum FilmStudyMarkerType {
+  NOTE
+  HIGHLIGHT
+  QUESTION
+  DRILL
+}
+
+model Playbook {
+  id          String   @id @default(uuid())
+  teamId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  plays       Play[]
+}
+
+model Play {
+  id            String         @id @default(uuid())
+  teamId        String
+  playbookId    String?
+  name          String
+  description   String?
+  category      PlayCategory
+  tags          String[]
+  positionData  Json
+  isPublished   Boolean        @default(false)
+  createdById   String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  createdBy     User           @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  team          Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playbook      Playbook?      @relation(fields: [playbookId], references: [id], onDelete: SetNull)
+  playVersions  PlayVersion[]
+  playViews     PlayView[]
+  playFrames    PlayFrame[]
+  trainingTasks TrainingTask[]
+}
+
+model PlayFrame {
+  id          String   @id @default(uuid())
+  playId      String
+  frameNumber Int
+  duration    Float    @default(1.0)
+  positions   Json
+  lines       Json     @default("[]")
+  annotations Json     @default("[]")
+  ballPosition Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  play        Play     @relation(fields: [playId], references: [id], onDelete: Cascade)
+
+  @@unique([playId, frameNumber])
+  @@index([playId])
+}
+
+model PlayVersion {
+  id            String   @id @default(uuid())
+  playId        String
+  versionNumber Int
+  positionData  Json
+  notes         String?
+  createdAt     DateTime @default(now())
+  play          Play     @relation(fields: [playId], references: [id], onDelete: Cascade)
+
+  @@unique([playId, versionNumber])
+}
+
+model PlayView {
+  id       String   @id @default(uuid())
+  playId   String
+  userId   String
+  viewedAt DateTime @default(now())
+  play     Play     @relation(fields: [playId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id               String      @id @default(uuid())
+  teamId           String
+  title            String
+  description      String?
+  startTime        DateTime
+  endTime          DateTime
+  location         String?
+  address          String?
+  latitude         Float?
+  longitude        Float?
+  isRecurring      Boolean     @default(false)
+  recurringPattern String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  team             Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  rsvps            EventRSVP[]
+}
+
+model EventRSVP {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  status    String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+model Practice {
+  id          String       @id @default(uuid())
+  teamId      String
+  location    String?
+  date        DateTime
+  duration    Int
+  notes       String?
+  playerStats PlayerStat[]
+  team        Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model TrainingTask {
+  id           String             @id @default(uuid())
+  title        String
+  description  String
+  category     String
+  difficulty   TrainingDifficulty @default(BEGINNER)
+  assignedById String
+  videoUrl     String?
+  linkedPlayId String?
+  dueDate      DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  progress     TrainingProgress[]
+  assignedBy   User               @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
+  linkedPlay   Play?              @relation(fields: [linkedPlayId], references: [id])
+}
+
+model TrainingProgress {
+  id               String             @id @default(uuid())
+  userId           String
+  taskId           String
+  status           TrainingTaskStatus @default(NOT_STARTED)
+  progress         Int                @default(0)
+  content          String?
+  submittedVideoId String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  task             TrainingTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+}
+
+model Equipment {
+  id               String           @id @default(uuid())
+  teamId           String
+  name             String
+  type             String
+  serialNumber     String?
+  purchaseDate     DateTime?
+  status           EquipmentStatus  @default(AVAILABLE)
+  assignedToId     String?
+  maintenanceNotes String?
+  lastMaintenance  DateTime?
+  nextMaintenance  DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  assignedTo       Player?          @relation(fields: [assignedToId], references: [id])
+  team             Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  maintenanceLogs  MaintenanceLog[]
+}
+
+model MaintenanceLog {
+  id            String    @id @default(uuid())
+  equipmentId   String
+  performedById String
+  date          DateTime
+  description   String
+  cost          Float?
+  createdAt     DateTime  @default(now())
+  equipment     Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  performedBy   User      @relation(fields: [performedById], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  ADMIN
+  COACH
+  EQUIPMENT_MANAGER
+  PLAYER
+  FAMILY
+  TEAM_MANAGER
+}
+
+enum AnnouncementPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PlayCategory {
+  OFFENSIVE
+  DEFENSIVE
+  SET_PIECE
+  DEFENSE
+  CORNER_KICKS
+  SIDE_OUTS
+  GOAL_KICKS
+  KICKOFFS
+  INDIRECT
+  DIRECT
+}
+
+enum TrainingTaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TrainingDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  RETIRED
+}
